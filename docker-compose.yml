@@ -3,6 +3,12 @@ version: '3.2'
 services:
   elasticsearch:
     image: elasticsearch:7.9.3
+    healthcheck:
+      test: curl -f -u elastic:changeme http://localhost:9200/_cat/health || exit 1
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 45s
     volumes:
       - type: bind
         source: ./elasticsearch/config/elasticsearch.yml
@@ -26,6 +32,12 @@ services:
 
   logstash:
     image: logstash:7.9.3
+    healthcheck:
+      test: curl -f -u elastic:changeme http://localhost:9600 || exit 1
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 45s
     volumes:
       - type: bind
         source: ./logstash/config/logstash.yml
@@ -52,6 +64,12 @@ services:
 
   kibana:
     image: kibana:7.9.3
+    healthcheck:
+      test: curl -f -u elastic:changeme http://localhost:5601 || exit 1
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 45s
     volumes:
       - type: bind
         source: ./kibana/config/kibana.yml
