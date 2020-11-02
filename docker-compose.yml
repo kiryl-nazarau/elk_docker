@@ -1,8 +1,9 @@
 version: '3.2'
 
 services:
-  elasticsearch:
+  es-data01:
     image: elasticsearch:7.9.3
+    container_name: es-data01
     healthcheck:
       test: curl -f -u elastic:changeme http://localhost:9200/_cat/health || exit 1
       interval: 30s
@@ -15,15 +16,48 @@ services:
         target: /usr/share/elasticsearch/config/elasticsearch.yml
         read_only: true
       - type: volume
-        source: elasticsearch
+        source: es-data01
         target: /usr/share/elasticsearch/data
     ports:
       - "9200:9200"
       - "9300:9300"
     environment:
+      node.name: es-data01
+      cluster.name: es-docker-cluster
       ES_JAVA_OPTS: "-Xmx256m -Xms256m"
       ELASTIC_PASSWORD: changeme
-      discovery.type: single-node
+      discovery.seed_hosts: es-data02
+      cluster.initial_master_nodes: es-data01
+    networks:
+      - elk_network
+    deploy:
+      mode: replicated
+      replicas: 1
+
+  es-data02:
+    image: elasticsearch:7.9.3
+    container_name: es-data02
+    healthcheck:
+      test: curl -f -u elastic:changeme http://localhost:9200/_cat/health || exit 1
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 45s
+    volumes:
+      - type: bind
+        source: ./elasticsearch/config/elasticsearch.yml
+        target: /usr/share/elasticsearch/config/elasticsearch.yml
+        read_only: true
+      - type: volume
+        source: es-data02
+        target: /usr/share/elasticsearch/data
+    environment:
+      node.name: es-data02
+      cluster.name: es-docker-cluster
+      ES_JAVA_OPTS: "-Xmx256m -Xms256m"
+      ELASTIC_PASSWORD: changeme
+      discovery.seed_hosts: es-data01
+      cluster.initial_master_nodes: es-data01
     networks:
       - elk_network
     deploy:
@@ -32,6 +66,7 @@ services:
 
   logstash:
     image: logstash:7.9.3
+    container_name: logstash
     healthcheck:
       test: curl -f -u elastic:changeme http://localhost:9600 || exit 1
       interval: 30s
@@ -60,16 +95,19 @@ services:
       mode: replicated
       replicas: 1
     depends_on:
-      - elasticsearch
+      - es-data01
 
   kibana:
     image: kibana:7.9.3
+    container_name: kibana
     healthcheck:
       test: curl -f -u elastic:changeme http://localhost:5601 || exit 1
       interval: 30s
       timeout: 5s
       retries: 3
       start_period: 45s
+    environment:
+      ELASTICSEARCH_HOSTS: http://es-data01:9200
     volumes:
       - type: bind
         source: ./kibana/config/kibana.yml
@@ -83,10 +121,11 @@ services:
       mode: replicated
       replicas: 1
     depends_on:
-      - elasticsearch
+      - es-data01
 
   cerebro:
     image: lmenezes/cerebro:0.9.2
+    container_name: cerebro
     ports:
       - "9000:9000"
     networks:
@@ -100,4 +139,7 @@ networks:
     driver: bridge
 
 volumes:
-  elasticsearch:
+  es-data01:
+    driver: local
+  es-data02:
+    driver: local
